@@ -1,3 +1,7 @@
 command = /opt/homebrew/bin/fish --login --interactive
-theme = TokyoNight Storm
+theme = dark:TokyoNight Storm,light:TokyoNight Day
 desktop-notifications = true
+working-directory = home
+window-width = 80
+window-height = 24
+confirm-close-surface = false
