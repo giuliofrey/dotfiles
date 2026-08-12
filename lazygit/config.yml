@@ -1,3 +1,9 @@
 git:
   pagers:
     - pager: delta --paging=never --features=colibri
+customCommands:
+  - key: "<c-v>"
+    context: "global"
+    command: "nvim ."
+    description: "open repo in nvim"
+    output: terminal
