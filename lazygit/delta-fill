@@ -1,0 +1,108 @@
+#!/usr/bin/env perl
+# Make lazygit's diff view wrap and fill the way Claude Code's renderer does.
+#
+# Three things delta cannot do itself in unified mode:
+#
+# 1. Fill to the edge. Delta ends a highlighted line with an erase-to-end-of-line
+#    escape (ESC[0K) and lets the terminal paint the rest of the row. lazygit's
+#    view does not replay it, so the highlight stops at the last character.
+#    (--line-fill-method=spaces pads with real spaces, but side-by-side only.)
+#
+# 2. Wrap under the gutter. lazygit word-wraps the whole line, so a continuation
+#    row starts at column 0 and its tail is left unpainted. This hard-wraps the
+#    *content* at the pane width minus the gutter, and re-opens each new row with
+#    a blanked line number and a repeated +/- marker, which is what Claude Code
+#    does.
+#
+# 3. Colour the gutter per row. Delta styles only the number placeholder, and it
+#    uses the *plus* style for the right-hand column on every row type, so a
+#    removed line otherwise shows a green gutter.
+#
+# Args: <pane width> [gutter width]. lazygit exports the pane width to the pager
+# as $COLUMNS. Gutter width must match the line-numbers format in config.yml:
+# '{np:>4}' plus the marker is 5. Given no width, this is a pass-through.
+use strict;
+use warnings;
+use utf8;
+binmode STDIN,  ':encoding(UTF-8)';
+binmode STDOUT, ':encoding(UTF-8)';
+
+my $width  = shift;
+my $gutter = shift;
+$width  = 0 unless defined $width  && $width  =~ /^\d+$/ && $width > 0;
+$gutter = 5 unless defined $gutter && $gutter =~ /^\d+$/;
+my $content_width = $width - $gutter;
+$width = 0 if $content_width < 1;
+
+while (my $line = <STDIN>) {
+    chomp $line;
+
+    # No fill marker means no background to extend, so leave it alone.
+    if (!$width || $line !~ /\e\[0K/) {
+        print "$line\n";
+        next;
+    }
+
+    # The escape just before the ESC[0K is this row's background colour.
+    my ($rowbg) = $line =~ /(\e\[[0-9;]*m)\e\[0K/;
+    $rowbg = '' unless defined $rowbg;
+    $line =~ s/\e\[0K//;
+
+    # Split into the gutter (first $gutter visible chars: the line number and
+    # the +/- marker) and the content after it. Escapes are kept in place so the
+    # colours survive; the blank copy replaces the number with spaces but keeps
+    # the marker, ready to head each continuation row.
+    my ($head, $blank, @rest) = ('', '', ());
+    my $seen = 0;
+    for my $tok ($line =~ /(\e\[[0-9;]*[a-zA-Z]|[^\e]+)/g) {
+        if ($tok =~ /^\e/) {
+            if ($seen < $gutter) { $head .= $tok; $blank .= $tok }
+            else                 { push @rest, $tok }
+            next;
+        }
+        if ($seen >= $gutter) { push @rest, $tok; next }
+        my $tail = '';
+        for my $ch (split //, $tok) {
+            if ($seen < $gutter) {
+                $head  .= $ch;
+                $blank .= (++$seen == $gutter) ? $ch : ' ';   # keep the marker
+            } else {
+                $tail .= $ch;
+            }
+        }
+        push @rest, $tail if length $tail;
+    }
+
+    # Pad the content out to a whole number of rows so the last one fills too.
+    my $visible = join '', @rest;
+    $visible =~ s/\e\[[0-9;]*[a-zA-Z]//g;
+    my $len  = length $visible;
+    my $rows = int(($len + $content_width - 1) / $content_width) || 1;
+    # Re-open the background first: delta closes the line with a reset, so
+    # padding appended after it would land outside the colour and stay blank.
+    push @rest, $rowbg, ' ' x ($rows * $content_width - $len);
+
+    # Hard-wrap the content, tracking which colours are open so each row can
+    # re-open them. An ESC[0m (or bare ESC[m) closes everything.
+    my (@sgr, @out);
+    my ($row, $col) = ($head, 0);
+    for my $tok (@rest) {
+        if ($tok =~ /^\e\[([0-9;]*)m$/) {
+            my $p = $1;
+            if ($p eq '' || $p eq '0') { @sgr = () } else { push @sgr, $tok }
+            $row .= $tok;
+        } elsif ($tok =~ /^\e/) {
+            $row .= $tok;
+        } else {
+            for my $ch (split //, $tok) {
+                $row .= $ch;
+                if (++$col == $content_width) {
+                    push @out, $rowbg . $row . "\e[0m";
+                    ($row, $col) = ($blank . join('', @sgr), 0);
+                }
+            }
+        }
+    }
+    push @out, $rowbg . $row . "\e[0m" if $col > 0 || !@out;
+    print "$_\n" for @out;
+}

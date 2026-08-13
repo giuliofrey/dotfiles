@@ -1,6 +1,48 @@
 git:
   pagers:
-    - pager: delta --paging=never --features=colibri
+    # width: lazygit runs the pager on a pipe, so delta cannot detect a width
+    #   and defaults to 80, then lazygit wraps that again. Hence the double wrap.
+    #   Use $COLUMNS, which lazygit sets to the diff pane's inner width, and NOT
+    #   the {{columnWidth}} template: that one is the side panel column, about
+    #   0.3x the terminal (26 in a 100-column terminal against a 64-wide pane).
+    # The colours and layout below are Claude Code's own diff renderer, read out
+    # of its binary: it does not use delta or any external differ, so these are
+    # transcribed rather than shared. Dark-theme truecolor values.
+    #   #022800 added row      #044700 added changed-words
+    #   #3D0100 removed row    #5C0200 removed changed-words
+    #   #50C850 added gutter   #DC5A5A removed gutter
+    # minus-style is "normal", not "syntax": Claude Code deliberately does not
+    #   syntax-highlight removed lines, only added and context ones.
+    # syntax-theme: Claude Code uses Monokai Extended, which is also delta's own
+    #   default, i.e. what this config had before I switched it to Nord.
+    # max-line-distance: Claude Code bails out of word-level highlighting once
+    #   more than 0.4 of the line has changed. Delta's default is 0.6, which is
+    #   what was matching near-unrelated prose lines and scattering shading.
+    # line-numbers-*-format: one column. No literal spaces around the placeholder
+    #   and no background on the number styles: delta paints only the placeholder
+    #   itself, so a literal space renders as an unpainted gap between the number
+    #   and the marker. delta-fill colours the whole gutter instead.
+    #   Delta cannot reproduce Claude Code's old-number-on-removed-lines: with
+    #   '{nm}{np}' context rows print both numbers. So removals show a blank.
+    - pager: >-
+        delta --paging=never --width=$COLUMNS --syntax-theme='Monokai Extended'
+        --line-numbers --keep-plus-minus-markers --max-line-distance=0.4
+        --hunk-header-style=omit --file-style=omit
+        --plus-style='syntax #022800' --plus-emph-style='syntax #044700'
+        --minus-style='normal #3D0100' --minus-emph-style='normal #5C0200'
+        --line-numbers-left-format= --line-numbers-right-format='{np:>4}'
+        --line-numbers-plus-style='#50C850' --line-numbers-minus-style='#DC5A5A'
+        --line-numbers-zero-style=dim
+        | ~/.config/lazygit/delta-fill $COLUMNS 5
+  # 3 lines of context shows only the change. 20 gives enough of the surrounding
+  # file to scroll through it. Adjustable live with } and {.
+  diffContextSize: 20
+gui:
+  # Expand the focused panel instead of four fixed blocks with Files empty
+  # and Commits cut off after 15 chars.
+  expandFocusedSidePanel: true
+  # 0.3333 truncates the panel tab titles at tmux-split widths.
+  sidePanelWidth: 0.4
 customCommands:
   - key: "<c-v>"
     context: "global"
