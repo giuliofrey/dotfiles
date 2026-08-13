@@ -98,7 +98,10 @@ if ! tmux has-session -t="$name" 2>/dev/null; then
 	left=$(tmux new-session -ds "$name" -c "$dir" -P -F '#{pane_id}')
 	right=$(tmux split-window -h -t "$left" -c "$dir" -P -F '#{pane_id}')
 	tmux send-keys -t "$left" lazygit C-m
-	tmux send-keys -t "$right" claude C-m
+	# --cwd scopes the agent view to this project. $PWD is expanded by the
+	# pane's own shell, which tmux already rooted at $dir. Safe unquoted here
+	# because default-shell is fish, which does not word-split variables.
+	tmux send-keys -t "$right" 'claude agents --cwd $PWD' C-m
 	# split-window leaves the new pane active, so you land on claude.
 fi
 
