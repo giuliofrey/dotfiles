@@ -3,7 +3,12 @@
 # ~/projects, most recently committed first, and attaches to (or creates) a
 # session rooted there. Bound to prefix+f in tmux.conf via display-popup.
 #
-# Run `sessionizer --list` to see the ordering without the fzf UI.
+#   sessionizer          picker; enter opens a shell, ctrl-o the split layout
+#   sessionizer DIR      skip the picker, open DIR with the split layout
+#   sessionizer --list   print the ordering without the fzf UI
+#
+# The DIR form is what prefix+F and the `ts` abbreviation use to open whatever
+# directory you are already in, without going through fzf.
 
 set -eu
 
@@ -64,28 +69,53 @@ if [ "${1:-}" = "--list" ]; then
 	exit 0
 fi
 
+# A directory argument skips the picker and always takes the split layout: the
+# point of this form is the two-pane session, and there is already a shell in
+# the directory you ran it from. cd -P resolves symlinks and a relative "." so
+# the session name and the pane paths agree with what tmux reports.
+if [ -n "${1:-}" ]; then
+	[ -d "$1" ] || { echo "not a directory: $1"; sleep 2; exit 1; }
+	dir=$(cd -P "$1" && pwd)
+	key=split
+else
+
 # A popup that vanishes instantly is miserable to debug, so say why.
 command -v fzf >/dev/null 2>&1 || { echo "fzf not found in PATH"; sleep 3; exit 1; }
 
 repos=$(list_repos)
 [ -n "$repos" ] || { echo "no git repos under $ROOTS"; sleep 2; exit 1; }
 
-selected=$(printf '%s\n' "$repos" | sed "s|^$HOME/||" | fzf \
+# --expect makes fzf print the key that confirmed the selection as its first
+# line of output, blank for a plain Enter, and the selection as the second.
+#
+# Not shift-enter: fzf rejects it ("unsupported key"), and tmux's extended-keys
+# is off, so the popup could not tell it from a plain Enter anyway. alt-enter is
+# bound as well, but on macOS it only reaches fzf with `macos-option-as-alt` set
+# in ghostty, which is unset here. ctrl-o works regardless.
+picked=$(printf '%s\n' "$repos" | sed "s|^$HOME/||" | fzf \
 	--prompt='project> ' \
 	--height=100% \
 	--reverse \
 	--border=none \
+	--expect=ctrl-o,alt-enter \
+	--header='enter: shell    ctrl-o: lazygit + claude' \
 	--preview='git -C "$HOME/{}" log -1 --format="%cr%n%s" 2>/dev/null || echo "no commits"' \
 	--preview-window=down,2,border-top) || exit 0
+
+key=$(printf '%s\n' "$picked" | sed -n 1p)
+selected=$(printf '%s\n' "$picked" | sed -n 2p)
 
 [ -n "$selected" ] || exit 0
 
 dir="$HOME/$selected"
+fi
+
 name=$(session_name "$dir")
 
-# New sessions open as a 50/50 split: lazygit left, claude right. This runs
-# only on creation, so re-selecting a project returns you to it as you left it
-# rather than stacking another split every time.
+# Plain Enter opens a bare shell in the project. ctrl-o opens the 50/50 split:
+# lazygit left, claude right. Either way this runs only on creation, so
+# re-selecting a project returns you to it as you left it rather than stacking
+# another split every time — including when you first opened it as a bare shell.
 #
 # The panes are addressed by pane id (%N) captured from -P, not by index:
 # pane-base-index is 1 in tmux.conf, so hardcoded .0/.1 would target the wrong
@@ -95,14 +125,19 @@ name=$(session_name "$dir")
 # started with a command dies when that command exits, so quitting lazygit
 # would collapse the layout. This leaves a shell behind instead.
 if ! tmux has-session -t="$name" 2>/dev/null; then
-	left=$(tmux new-session -ds "$name" -c "$dir" -P -F '#{pane_id}')
-	right=$(tmux split-window -h -t "$left" -c "$dir" -P -F '#{pane_id}')
-	tmux send-keys -t "$left" lazygit C-m
-	# --cwd scopes the agent view to this project. $PWD is expanded by the
-	# pane's own shell, which tmux already rooted at $dir. Safe unquoted here
-	# because default-shell is fish, which does not word-split variables.
-	tmux send-keys -t "$right" 'claude agents --cwd $PWD' C-m
-	# split-window leaves the new pane active, so you land on claude.
+	if [ -n "$key" ]; then
+		left=$(tmux new-session -ds "$name" -c "$dir" -P -F '#{pane_id}')
+		right=$(tmux split-window -h -t "$left" -c "$dir" -P -F '#{pane_id}')
+		tmux send-keys -t "$left" lazygit C-m
+		# --cwd scopes the agent view to this project. $PWD is expanded by
+		# the pane's own shell, which tmux already rooted at $dir. Safe
+		# unquoted here because default-shell is fish, which does not
+		# word-split variables.
+		tmux send-keys -t "$right" 'claude agents --cwd $PWD' C-m
+		# split-window leaves the new pane active, so you land on claude.
+	else
+		tmux new-session -ds "$name" -c "$dir"
+	fi
 fi
 
 # switch-client works from inside tmux (the popup case); attach covers running

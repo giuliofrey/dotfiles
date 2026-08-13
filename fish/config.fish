@@ -23,5 +23,8 @@ alias claude-personal="CLAUDE_CONFIG_DIR=~/.claude-personal claude"
 # tmux project picker. Works in or out of tmux: the script switches the client
 # if $TMUX is set, attaches if not.
 abbr -a t "$HOME/.config/tmux/sessionizer"
+# ts: same split layout, but for the directory you are already in. Same thing
+# prefix+F does from inside tmux.
+abbr -a ts "$HOME/.config/tmux/sessionizer ."
 abbr -a ta "tmux attach"
 abbr -a tl "tmux list-sessions"
