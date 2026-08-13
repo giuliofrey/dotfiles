@@ -1,0 +1,16 @@
+*
+!*/
+!.gitignore
+!fish/**
+!ghostty/**
+!git/**
+!htop/**
+!lazygit/**
+!nvim/**
+!tmux/**
+
+# fish rewrites this itself; it is machine state, not config. EDITOR lives in
+# fish/config.fish instead so it is visible and travels with the repo.
+fish/fish_variables
+tmux/plugins/
+.DS_Store
