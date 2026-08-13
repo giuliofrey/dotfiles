@@ -3,7 +3,6 @@
 !.gitignore
 !fish/**
 !ghostty/**
-!git/**
 !htop/**
 !lazygit/**
 !nvim/**
