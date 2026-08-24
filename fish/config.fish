@@ -1,17 +1,28 @@
 if status is-interactive
-    /opt/homebrew/bin/brew shellenv | source # Commands to run in interactive sessions can go here
+    # Homebrew's prefix is /opt/homebrew on Apple silicon, /usr/local on Intel
+    # and /home/linuxbrew/.linuxbrew on Linux. Take the first one that is
+    # actually there; a machine without brew just skips the block.
+    for brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew
+        if test -x $brew
+            $brew shellenv | source
+            break
+        end
+    end
 end
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-if test -f /Users/giulio/miniconda3/bin/conda
-    eval /Users/giulio/miniconda3/bin/conda "shell.fish" hook $argv | source
-else
-    if test -f "/Users/giulio/miniconda3/etc/fish/conf.d/conda.fish"
-        . "/Users/giulio/miniconda3/etc/fish/conf.d/conda.fish"
-    else
-        set -x PATH /Users/giulio/miniconda3/bin $PATH
-    end
+# Hand-edited to $HOME: conda init hardcodes the absolute path of the machine it
+# ran on, which does not survive a repo shared between machines. Re-running
+# `conda init fish` puts the absolute path back, so re-apply this if that happens.
+# The last branch also checks the directory exists now, rather than prepending a
+# path that is not there on a machine without conda.
+if test -f $HOME/miniconda3/bin/conda
+    eval $HOME/miniconda3/bin/conda "shell.fish" hook $argv | source
+else if test -f "$HOME/miniconda3/etc/fish/conf.d/conda.fish"
+    . "$HOME/miniconda3/etc/fish/conf.d/conda.fish"
+else if test -d $HOME/miniconda3/bin
+    set -x PATH $HOME/miniconda3/bin $PATH
 end
 # <<< conda initialize <<<
 
@@ -26,5 +37,18 @@ abbr -a t "$HOME/.config/tmux/sessionizer"
 # ts: same split layout, but for the directory you are already in. Same thing
 # prefix+F does from inside tmux.
 abbr -a ts "$HOME/.config/tmux/sessionizer ."
-abbr -a ta "tmux attach"
+# ta with no argument attaches to the most recent session; `ta name` picks one.
+# attach-session reads its target from -t and accepts no positional argument, so
+# the old plain `tmux attach` abbr expanded `ta survey` into `tmux attach survey`
+# and died on "too many arguments". Worth knowing: sessionizer names every
+# session after its repo directory and never numbers them, so `ta 1` reports
+# "can't find session: 1" no matter how many sessions are running. tmux matches
+# on a name prefix, so `ta surv` is enough.
+function ta --description "attach to a tmux session by name, or the most recent"
+    if set -q argv[1]
+        tmux attach -t $argv[1]
+    else
+        tmux attach
+    end
+end
 abbr -a tl "tmux list-sessions"

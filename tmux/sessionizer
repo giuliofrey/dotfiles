@@ -88,6 +88,10 @@ repos=$(list_repos)
 # --expect makes fzf print the key that confirmed the selection as its first
 # line of output, blank for a plain Enter, and the selection as the second.
 #
+# --no-sort keeps the commit ordering once you start typing. Without it fzf
+# re-ranks matches by its own fuzzy score, so "s" put archive/stack above a repo
+# committed yesterday and the whole point of sorting the list was lost.
+#
 # Not shift-enter: fzf rejects it ("unsupported key"), and tmux's extended-keys
 # is off, so the popup could not tell it from a plain Enter anyway. alt-enter is
 # bound as well, but on macOS it only reaches fzf with `macos-option-as-alt` set
@@ -98,6 +102,7 @@ picked=$(printf '%s\n' "$repos" | sed "s|^$HOME/||" | fzf \
 	--reverse \
 	--border=none \
 	--expect=ctrl-o,alt-enter \
+	--no-sort \
 	--header='enter: shell    ctrl-o: lazygit + claude' \
 	--preview='git -C "$HOME/{}" log -1 --format="%cr%n%s" 2>/dev/null || echo "no commits"' \
 	--preview-window=down,2,border-top) || exit 0

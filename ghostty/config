@@ -1,4 +1,10 @@
-command = /opt/homebrew/bin/fish --login --interactive
+# A bare command is looked up in PATH, but on macOS ghostty inherits launchd's
+# PATH (/usr/bin:/bin:/usr/sbin:/sbin), which has no homebrew in it, so `fish`
+# alone would not resolve. Put the homebrew prefixes in front and let the lookup
+# find fish wherever this machine keeps it; a prefix that does not exist costs
+# nothing. `shell:` forces the /bin/sh -c wrapper instead of leaving it to
+# ghostty's heuristic.
+command = shell:export PATH="/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"; exec fish --login --interactive
 theme = dark:TokyoNight Storm,light:TokyoNight Day
 desktop-notifications = true
 working-directory = home
