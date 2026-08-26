@@ -1,10 +1,8 @@
-# A bare command is looked up in PATH, but on macOS ghostty inherits launchd's
-# PATH (/usr/bin:/bin:/usr/sbin:/sbin), which has no homebrew in it, so `fish`
-# alone would not resolve. Put the homebrew prefixes in front and let the lookup
-# find fish wherever this machine keeps it; a prefix that does not exist costs
-# nothing. `shell:` forces the /bin/sh -c wrapper instead of leaving it to
-# ghostty's heuristic.
-command = shell:export PATH="/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"; exec fish --login --interactive
+# Ghostty prepends `exec -l` to the command, so a shell builtin like `export`
+# at the front is looked up as a binary and fails. Absolute path instead: no
+# PATH lookup needed (launchd's PATH has no homebrew), and config.fish runs
+# `brew shellenv` anyway.
+command = /opt/homebrew/bin/fish --login --interactive
 theme = dark:TokyoNight Storm,light:TokyoNight Day
 desktop-notifications = true
 working-directory = home
