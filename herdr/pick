@@ -1,0 +1,52 @@
+#!/bin/sh
+# Project picker for herdr, bound to prefix+f in config.toml. The repo list and
+# its ordering come from tmux/sessionizer --list, so there is one find to keep
+# working rather than two that drift apart.
+#
+# Enter creates a workspace rooted at the repo and starts claude in its root
+# pane, which is what ctrl-o does in the tmux picker. The lazygit half of that
+# split is not recreated: the sidebar shows branch and status, and lazygit is
+# prefix+g.
+
+set -eu
+
+# A popup that vanishes instantly is miserable to debug, so say why.
+[ "${HERDR_ENV:-}" = "1" ] || { echo "not running inside herdr"; sleep 2; exit 1; }
+command -v fzf >/dev/null 2>&1 || { echo "fzf not found in PATH"; sleep 3; exit 1; }
+
+# --list prints paths as ~/foo for a readable narrow popup; strip the prefix so
+# the preview can put $HOME back the way the tmux picker does.
+picked=$(~/.config/tmux/sessionizer --list | sed 's|^~/||' | fzf \
+	--prompt='project> ' \
+	--height=100% \
+	--reverse \
+	--border=none \
+	--no-sort \
+	--header='enter: workspace + claude' \
+	--preview='git -C $HOME/{} log -1 --format="%cr%n%s" 2>/dev/null || echo "no commits"' \
+	--preview-window=down,2,border-top) || exit 0
+
+[ -n "$picked" ] || exit 0
+dir="$HOME/$picked"
+label=$(basename "$dir")
+
+# Re-selecting a project returns you to it rather than stacking a second
+# workspace, same as the tmux picker's has-session check. Labels are what this
+# script sets, so matching on one is enough; WorkspaceInfo carries no cwd.
+existing=$(herdr workspace list \
+	| jq -r --arg l "$label" 'first(.result.workspaces[]? | select(.label == $l) | .workspace_id) // empty')
+if [ -n "$existing" ]; then
+	herdr workspace focus "$existing"
+	exit 0
+fi
+
+# Take the pane id out of the JSON; the skill is explicit that IDs are opaque
+# and must not be predicted.
+pane=$(herdr workspace create --cwd "$dir" --label "$label" --focus \
+	| jq -r '.result.root_pane.pane_id')
+[ -n "$pane" ] && [ "$pane" != null ] || { echo "workspace created but no pane id"; sleep 3; exit 1; }
+
+# `claude agents`, same as the tmux picker. herdr's sidebar does not replace it:
+# the sidebar lists panes, and background sessions dispatched from the agent
+# view have no pane of their own, so they only appear inside this one.
+herdr pane run "$pane" 'claude agents --cwd $PWD'

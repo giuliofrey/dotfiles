@@ -1,0 +1,121 @@
+# herdr configuration. Reload in place with prefix+shift+r or
+# `herdr server reload-config`. Settings that describe how a pane is created
+# (default_shell, new_cwd) only reach panes opened after the reload; the only
+# setting herdr documents as needing a full relaunch is sidebar_start_collapsed.
+#
+# herdr replaces tmux for agent work rather than nesting inside it: both are
+# multiplexers, and two prefix keys in one terminal is a fight nobody wins.
+# tmux stays for everything else, which is why the keys below mirror tmux.conf.
+
+[terminal]
+# $SHELL is /bin/zsh on this machine, so panes would come up in zsh. tmux.conf
+# sets default-shell for the same reason.
+default_shell = "/opt/homebrew/bin/fish"
+
+[theme]
+# Same rule as the tmux status line: herdr picks no colours of its own, so
+# ghostty's TokyoNight Storm/Day switch comes through untouched and nothing
+# needs re-tuning when the system flips appearance.
+name = "terminal"
+
+[keys]
+# C-Space, matching tmux.conf: C-b is readline's back-one-char, C-a its
+# beginning-of-line.
+prefix = "ctrl+space"
+# prefix+hjkl focus, prefix+minus horizontal split and prefix+z zoom are already
+# herdr defaults and already match tmux.conf. The vertical split stays on
+# prefix+v rather than tmux's prefix+| because herdr does not accept | as a key.
+
+# prefix+f, the project picker, same key as tmux.conf. See herdr/pick.
+[[keys.command]]
+key = "prefix+f"
+type = "popup"
+command = "$HOME/.config/herdr/pick"
+width = "70%"
+height = "60%"
+
+# prefix+a, a second agent beside this one. herdr has no built-in binding for
+# starting an agent: `agent start` needs a pane that already exists, so the
+# split has to come first, and this is the one-line version of that.
+#
+# `fish -C claude` rather than `claude`, because a type="pane" command closes
+# its pane when it exits and quitting the agent should leave a shell behind,
+# not collapse the split. Same reasoning as the sessionizer's send-keys.
+[[keys.command]]
+key = "prefix+a"
+type = "pane"
+command = "fish -C claude"
+
+# lazygit moves from the sessionizer's permanent left pane to a popup: the
+# herdr sidebar already carries branch and git status, so that pane sat idle
+# most of the time and cost half the width.
+#
+# prefix+d, not the obvious prefix+g: that is herdr's own goto/navigate mode.
+# herdr's example config puts lazygit on prefix+alt+g to dodge the same clash,
+# but ghostty here has no macos-option-as-alt, so alt chords never arrive.
+[[keys.command]]
+key = "prefix+d"
+type = "popup"
+command = "lazygit"
+width = "90%"
+height = "90%"
+
+[ui]
+# The sidebar is the reason to run herdr at all, so give it the branch and
+# status line the tmux status bar never had.
+agent_panel_sort = "spaces"
+[ui.sidebar.spaces]
+rows = [["state_icon", "workspace"], ["branch", "git_status"]]
+
+[ui.toast]
+# Desktop notifications when a background agent finishes or blocks. The
+# Notification hook in ~/.claude/settings.json only rings the bell, which is
+# useless once the pane is off-screen.
+delivery = "system"
+
+# The herdr side of ChmaraX/herdr-nvim, installed with `herdr plugin install`.
+# prefix+e opens nvim as a sidebar pane, prefix+o jumps to a file path printed
+# in the agent's output. The nvim side lives in nvim/lua/plugins/herdr.lua and
+# is remapped off <leader>a there, since claudecode already holds that group.
+[[keys.command]]
+key = "prefix+e"
+type = "plugin_action"
+command = "chmarax.herdr-nvim.toggle"
+description = "nvim sidebar"
+
+[[keys.command]]
+key = "prefix+o"
+type = "plugin_action"
+command = "chmarax.herdr-nvim.pick-file"
+description = "open file from agent output"
+
+# prefix+r, reviewr's diff pane (persiyanov.reviewr). Lowercase only: herdr's own
+# config reload is prefix+shift+r, so the two do not collide. reviewr's own
+# settings — theme, navigator side — live in its plugin config dir, not here.
+[[keys.command]]
+key = "prefix+r"
+type = "plugin_action"
+command = "persiyanov.reviewr.toggle"
+description = "reviewr: toggle diff pane"
+
+# prefix+t, the Pythia job queue in a split to the right. `ssh pythia` carries
+# the key, user and SetEnv TERM from ~/.ssh/config, so only the command is here.
+#
+# type = "shell", not "pane": a type="pane" command opens a *zoomed* pane and a
+# keybinding has no placement option, so the split has to go through the API.
+# Same two-step as herdr/pick — split, take the new pane id out of the JSON,
+# then `pane run` into it. IDs are opaque, so read it rather than predict it.
+#
+# -t forces a TTY: ssh allocates one for a bare login but not when a command
+# follows, and turm is a TUI that draws nothing without one.
+#
+# No failure guard, unlike a type="pane" version would need: `pane run` types
+# into a real shell pane, so an ssh that fails with the Booth VPN down leaves
+# the error on screen at a prompt instead of closing the pane under it.
+#
+# Not prefix+p: that is herdr's own previous_tab.
+[[keys.command]]
+key = "prefix+t"
+type = "shell"
+command = "herdr pane run $(herdr pane split --pane $HERDR_ACTIVE_PANE_ID --direction right --focus | jq -r .result.pane.pane_id) 'ssh -t pythia turm --me'"
+description = "pythia: my slurm jobs"

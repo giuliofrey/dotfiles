@@ -3,6 +3,8 @@
 !.gitignore
 !fish/**
 !ghostty/**
+!herdr/config.toml
+!herdr/pick
 !htop/**
 !lazygit/**
 !nvim/**
@@ -14,4 +16,3 @@
 fish/fish_variables
 tmux/plugins/
 .DS_Store
-fish/functions/claude-uchicago.fish
