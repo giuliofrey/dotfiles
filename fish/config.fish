@@ -12,11 +12,9 @@ end
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-# Hand-edited to $HOME: conda init hardcodes the absolute path of the machine it
-# ran on, which does not survive a repo shared between machines. Re-running
-# `conda init fish` puts the absolute path back, so re-apply this if that happens.
-# The last branch also checks the directory exists now, rather than prepending a
-# path that is not there on a machine without conda.
+# Hand-edited to $HOME: conda init hardcodes an absolute path that does not
+# survive a shared repo. Re-running `conda init fish` undoes this. The last
+# branch also checks the directory exists before prepending it.
 if test -f $HOME/miniconda3/bin/conda
     eval $HOME/miniconda3/bin/conda "shell.fish" hook $argv | source
 else if test -f "$HOME/miniconda3/etc/fish/conf.d/conda.fish"
@@ -28,8 +26,6 @@ end
 
 set -gx EDITOR nvim
 
-# claude personal key
-alias claude-personal="CLAUDE_CONFIG_DIR=~/.claude-personal claude"
 
 # tmux project picker. Works in or out of tmux: the script switches the client
 # if $TMUX is set, attaches if not.
@@ -38,17 +34,25 @@ abbr -a t "$HOME/.config/tmux/sessionizer"
 # prefix+F does from inside tmux.
 abbr -a ts "$HOME/.config/tmux/sessionizer ."
 # ta with no argument attaches to the most recent session; `ta name` picks one.
-# attach-session reads its target from -t and accepts no positional argument, so
-# the old plain `tmux attach` abbr expanded `ta survey` into `tmux attach survey`
-# and died on "too many arguments". Worth knowing: sessionizer names every
-# session after its repo directory and never numbers them, so `ta 1` reports
-# "can't find session: 1" no matter how many sessions are running. tmux matches
-# on a name prefix, so `ta surv` is enough.
-function ta --description "attach to a tmux session by name, or the most recent"
-    if set -q argv[1]
-        tmux attach -t $argv[1]
-    else
+# A function, not an abbr, because attach-session takes its target from -t and
+# the plain form died on "too many arguments". Name prefixes work, so `ta surv`
+# is enough.
+#
+# A bare number resolves to the Nth line of `tmux ls`, which `tl` prints;
+# sessions are named after their repo, so tmux would read `ta 1` as a name.
+function ta --description "attach to a tmux session by name, number, or the most recent"
+    if not set -q argv[1]
         tmux attach
+    else if string match -qr '^\d+$' -- $argv[1]
+        set -l target (tmux ls | sed -n "$argv[1]p" | cut -d: -f1)
+        if test -z "$target"
+            echo "no session $argv[1]" >&2
+            return 1
+        end
+        tmux attach -t $target
+    else
+        tmux attach -t $argv[1]
     end
 end
-abbr -a tl "tmux list-sessions"
+# Numbered, because that is what `ta N` counts against.
+abbr -a tl "tmux ls | nl -w2 -s' '"
