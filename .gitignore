@@ -14,3 +14,4 @@
 fish/fish_variables
 tmux/plugins/
 .DS_Store
+fish/functions/claude-uchicago.fish
