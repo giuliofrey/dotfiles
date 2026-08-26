@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // github-copilot doesn't auto-register from the models.dev catalog on this
+  // install, so declare it explicitly. OpenCode's built-in Copilot OAuth loader
+  // still handles the token exchange because the provider id is "github-copilot".
+  // Models limited to what Copilot Student + the "opencode" integrator allow
+  // (GPT models work; Claude/premium are gated). Add more with `opencode models`.
+  "provider": {
+    "github-copilot": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "GitHub Copilot",
+      "options": { "baseURL": "https://api.githubcopilot.com" },
+      "models": {
+        "gpt-4o": { "name": "GPT-4o" },
+        "gpt-4.1": { "name": "GPT-4.1" }
+      }
+    }
+  }
+}

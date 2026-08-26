@@ -6,6 +6,7 @@
 !htop/**
 !lazygit/**
 !nvim/**
+!opencode/**
 !tmux/**
 
 # fish rewrites this itself; it is machine state, not config. EDITOR lives in
