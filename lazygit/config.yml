@@ -18,6 +18,9 @@ git:
     # max-line-distance: Claude Code bails out of word-level highlighting once
     #   more than 0.4 of the line has changed. Delta's default is 0.6, which is
     #   what was matching near-unrelated prose lines and scattering shading.
+    # file-style: not omitted. With one file selected the Files panel already names
+    #   it, but a range selection concatenates several files' hunks into one diff
+    #   with nothing between them. The header plus underline is the separator.
     # line-numbers-*-format: one column. No literal spaces around the placeholder
     #   and no background on the number styles: delta paints only the placeholder
     #   itself, so a literal space renders as an unpainted gap between the number
@@ -25,7 +28,7 @@ git:
     #   Delta cannot reproduce Claude Code's old-number-on-removed-lines: with
     #   '{nm}{np}' context rows print both numbers. So removals show a blank.
     - command: >-
-        delta --paging=never --width=$COLUMNS --syntax-theme='Monokai Extended' --line-numbers --keep-plus-minus-markers --max-line-distance=0.4 --hunk-header-style=omit --file-style=omit --plus-style='syntax #022800' --plus-emph-style='syntax #044700' --minus-style='normal #3D0100' --minus-emph-style='normal #5C0200' --line-numbers-left-format= --line-numbers-right-format='{np:>4}' --line-numbers-plus-style='#50C850' --line-numbers-minus-style='#DC5A5A' --line-numbers-zero-style=dim | ~/.config/lazygit/delta-fill $COLUMNS 5
+        delta --paging=never --width=$COLUMNS --syntax-theme='Monokai Extended' --line-numbers --keep-plus-minus-markers --max-line-distance=0.4 --hunk-header-style=omit --file-style='bold #61AFEF' --file-decoration-style='#3B4048 ul' --plus-style='syntax #022800' --plus-emph-style='syntax #044700' --minus-style='normal #3D0100' --minus-emph-style='normal #5C0200' --line-numbers-left-format= --line-numbers-right-format='{np:>4}' --line-numbers-plus-style='#50C850' --line-numbers-minus-style='#DC5A5A' --line-numbers-zero-style=dim | ~/.config/lazygit/delta-fill $COLUMNS 5
   # 3 lines of context shows only the change. 20 gives enough of the surrounding
   # file to scroll through it. Adjustable live with } and {.
   diffContextSize: 20
