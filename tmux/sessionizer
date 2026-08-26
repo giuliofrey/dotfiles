@@ -1,6 +1,6 @@
 #!/bin/sh
-# Project picker for tmux. Lists every git repo directly under ~/personal and
-# ~/projects, most recently committed first, and attaches to (or creates) a
+# Project picker for tmux. Lists every git repo under ~/personal, ~/projects and
+# ~/.config, most recently committed first, and attaches to (or creates) a
 # session rooted there. Bound to prefix+f in tmux.conf via display-popup.
 #
 #   sessionizer          picker; enter opens a shell, ctrl-o the split layout
@@ -12,24 +12,19 @@
 
 set -eu
 
-ROOTS="$HOME/personal $HOME/projects"
+ROOTS="$HOME/personal $HOME/projects $HOME/.config"
 DEPTH=10   # directory levels below each root to search
 
-# Sort key is the last commit timestamp, not directory mtime: mtime churns on
-# any git operation (fetch, checkout, even status), so it answers "which repo
-# did git touch last" rather than "which project did I last work on".
+# Sort key is the last commit timestamp, not mtime: mtime churns on any git
+# operation, so it answers "which repo did git touch last" rather than "which
+# project did I last work on".
 #
-# -prune stops find descending into .git itself. Repos nested inside other
-# repos (submodules, vendored code) are still listed, since opening one as its
-# own session is a reasonable thing to want.
+# Virtualenvs dominate the walk (28k of 38k directories here) and never hold a
+# project worth opening, so pruning them takes find from 0.38s to 0.06s and
+# finds the same repos. Nested repos are still listed.
 #
-# Virtualenvs are pruned because they dominate the walk: of the 38k directories
-# under these roots, 28k are inside .venv/venv. Skipping them takes find from
-# 0.38s to 0.06s and finds exactly the same repos. A repo that lives inside a
-# virtualenv is not a project you open.
-#
-# The git calls run under xargs -P: a repo with no commits exits non-zero, so
-# it scores 0 and sorts last rather than vanishing from the list.
+# A repo with no commits exits non-zero under xargs, so it scores 0 and sorts
+# last rather than vanishing from the list.
 PRUNE='-name .venv -o -name venv -o -name node_modules -o -name __pycache__'
 list_repos() {
 	for root in $ROOTS; do
@@ -44,16 +39,13 @@ list_repos() {
 	| sort -rn | cut -f2
 }
 
-# Searching 10 levels deep means basenames repeat: there are two "website"
-# repos and two "draft" repos. Naming both sessions by basename would make the
-# second selection silently switch to the first project instead of opening the
-# one asked for, so a name already taken by a different directory gets
-# qualified with its parent.
+# Basenames repeat at this depth (two "website" repos, two "draft"). Naming both
+# by basename would silently switch to the first, so a name already taken by a
+# different directory gets qualified with its parent.
 session_name() {
 	base=$(basename "$1" | tr '.:' '__')
-	# list-sessions -f, not display-message -t: display-message takes a target
-	# pane, so a session name silently resolves to nothing and the collision
-	# check never fires. This form returns the path, or empty if no such session.
+	# list-sessions -f, not display-message -t: the latter takes a target pane, so
+	# a session name resolves to nothing and the collision check never fires.
 	taken=$(tmux list-sessions -F '#{session_path}' \
 		-f "#{==:#{session_name},$base}" 2>/dev/null) || taken=""
 	if [ -n "$taken" ] && [ "$taken" != "$1" ]; then
@@ -69,10 +61,9 @@ if [ "${1:-}" = "--list" ]; then
 	exit 0
 fi
 
-# A directory argument skips the picker and always takes the split layout: the
-# point of this form is the two-pane session, and there is already a shell in
-# the directory you ran it from. cd -P resolves symlinks and a relative "." so
-# the session name and the pane paths agree with what tmux reports.
+# A directory argument skips the picker and always takes the split layout, since
+# that is the point of this form. cd -P resolves symlinks and a relative "." so
+# the session name and pane paths agree with what tmux reports.
 if [ -n "${1:-}" ]; then
 	[ -d "$1" ] || { echo "not a directory: $1"; sleep 2; exit 1; }
 	dir=$(cd -P "$1" && pwd)
@@ -85,17 +76,19 @@ command -v fzf >/dev/null 2>&1 || { echo "fzf not found in PATH"; sleep 3; exit 
 repos=$(list_repos)
 [ -n "$repos" ] || { echo "no git repos under $ROOTS"; sleep 2; exit 1; }
 
-# --expect makes fzf print the key that confirmed the selection as its first
-# line of output, blank for a plain Enter, and the selection as the second.
+# --expect prints the confirming key as the first output line, blank for a plain
+# Enter, and the selection as the second. --no-sort keeps the commit ordering
+# once you start typing, which fzf's own fuzzy score would otherwise override.
 #
-# --no-sort keeps the commit ordering once you start typing. Without it fzf
-# re-ranks matches by its own fuzzy score, so "s" put archive/stack above a repo
-# committed yesterday and the whole point of sorting the list was lost.
+# ctrl-o, not shift-enter: fzf rejects that one, and alt-enter needs
+# `macos-option-as-alt` in ghostty, which is unset here.
 #
-# Not shift-enter: fzf rejects it ("unsupported key"), and tmux's extended-keys
-# is off, so the popup could not tell it from a plain Enter anyway. alt-enter is
-# bound as well, but on macOS it only reaches fzf with `macos-option-as-alt` set
-# in ghostty, which is unset here. ctrl-o works regardless.
+# $HOME/{} stays unquoted: fzf substitutes {} already shell-quoted, so quoting it
+# again yields /Users/giulio/'projects/foo', which does not exist.
+#
+# Comments stay above the command: a `\` continuation splices the next line on,
+# so a comment between continued arguments ends the command there. That silently
+# dropped --preview once.
 picked=$(printf '%s\n' "$repos" | sed "s|^$HOME/||" | fzf \
 	--prompt='project> ' \
 	--height=100% \
@@ -104,7 +97,7 @@ picked=$(printf '%s\n' "$repos" | sed "s|^$HOME/||" | fzf \
 	--expect=ctrl-o,alt-enter \
 	--no-sort \
 	--header='enter: shell    ctrl-o: lazygit + claude' \
-	--preview='git -C "$HOME/{}" log -1 --format="%cr%n%s" 2>/dev/null || echo "no commits"' \
+	--preview='git -C $HOME/{} log -1 --format="%cr%n%s" 2>/dev/null || echo "no commits"' \
 	--preview-window=down,2,border-top) || exit 0
 
 key=$(printf '%s\n' "$picked" | sed -n 1p)
@@ -117,27 +110,23 @@ fi
 
 name=$(session_name "$dir")
 
-# Plain Enter opens a bare shell in the project. ctrl-o opens the 50/50 split:
-# lazygit left, claude right. Either way this runs only on creation, so
-# re-selecting a project returns you to it as you left it rather than stacking
-# another split every time — including when you first opened it as a bare shell.
+# Enter opens a bare shell, ctrl-o the 50/50 split of lazygit and claude. Runs
+# only on creation, so re-selecting a project returns you to it as you left it
+# rather than stacking another split.
 #
-# The panes are addressed by pane id (%N) captured from -P, not by index:
-# pane-base-index is 1 in tmux.conf, so hardcoded .0/.1 would target the wrong
-# pane the moment that setting changed.
+# Panes are addressed by id (%N) from -P, not index: pane-base-index is 1, so
+# hardcoded .0/.1 would break if that changed.
 #
 # send-keys rather than passing the command to new-session/split-window: a pane
-# started with a command dies when that command exits, so quitting lazygit
-# would collapse the layout. This leaves a shell behind instead.
+# started with a command dies when it exits, so quitting lazygit would collapse
+# the layout.
 if ! tmux has-session -t="$name" 2>/dev/null; then
 	if [ -n "$key" ]; then
 		left=$(tmux new-session -ds "$name" -c "$dir" -P -F '#{pane_id}')
 		right=$(tmux split-window -h -t "$left" -c "$dir" -P -F '#{pane_id}')
 		tmux send-keys -t "$left" lazygit C-m
-		# --cwd scopes the agent view to this project. $PWD is expanded by
-		# the pane's own shell, which tmux already rooted at $dir. Safe
-		# unquoted here because default-shell is fish, which does not
-		# word-split variables.
+		# $PWD is expanded by the pane's own shell, already rooted at $dir.
+		# Unquoted is safe because fish does not word-split variables.
 		tmux send-keys -t "$right" 'claude agents --cwd $PWD' C-m
 		# split-window leaves the new pane active, so you land on claude.
 	else
