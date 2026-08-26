@@ -1,5 +1,5 @@
 git:
-  pagers:
+  diffRenderers:
     # width: lazygit runs the pager on a pipe, so delta cannot detect a width
     #   and defaults to 80, then lazygit wraps that again. Hence the double wrap.
     #   Use $COLUMNS, which lazygit sets to the diff pane's inner width, and NOT
@@ -24,16 +24,8 @@ git:
     #   and the marker. delta-fill colours the whole gutter instead.
     #   Delta cannot reproduce Claude Code's old-number-on-removed-lines: with
     #   '{nm}{np}' context rows print both numbers. So removals show a blank.
-    - pager: >-
-        delta --paging=never --width=$COLUMNS --syntax-theme='Monokai Extended'
-        --line-numbers --keep-plus-minus-markers --max-line-distance=0.4
-        --hunk-header-style=omit --file-style=omit
-        --plus-style='syntax #022800' --plus-emph-style='syntax #044700'
-        --minus-style='normal #3D0100' --minus-emph-style='normal #5C0200'
-        --line-numbers-left-format= --line-numbers-right-format='{np:>4}'
-        --line-numbers-plus-style='#50C850' --line-numbers-minus-style='#DC5A5A'
-        --line-numbers-zero-style=dim
-        | ~/.config/lazygit/delta-fill $COLUMNS 5
+    - command: >-
+        delta --paging=never --width=$COLUMNS --syntax-theme='Monokai Extended' --line-numbers --keep-plus-minus-markers --max-line-distance=0.4 --hunk-header-style=omit --file-style=omit --plus-style='syntax #022800' --plus-emph-style='syntax #044700' --minus-style='normal #3D0100' --minus-emph-style='normal #5C0200' --line-numbers-left-format= --line-numbers-right-format='{np:>4}' --line-numbers-plus-style='#50C850' --line-numbers-minus-style='#DC5A5A' --line-numbers-zero-style=dim | ~/.config/lazygit/delta-fill $COLUMNS 5
   # 3 lines of context shows only the change. 20 gives enough of the surrounding
   # file to scroll through it. Adjustable live with } and {.
   diffContextSize: 20
