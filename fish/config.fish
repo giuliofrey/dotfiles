@@ -26,6 +26,11 @@ end
 
 set -gx EDITOR nvim
 
+# cargo installs binaries here and rustup ships no env.fish, so nothing else
+# puts it on PATH. fish_add_path is idempotent and skips the directory if it is
+# not there, so a machine without rust is unaffected.
+fish_add_path -g $HOME/.cargo/bin
+
 
 # tmux project picker. Works in or out of tmux: the script switches the client
 # if $TMUX is set, attaches if not.
