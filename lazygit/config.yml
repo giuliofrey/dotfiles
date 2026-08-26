@@ -5,16 +5,26 @@ git:
     #   Use $COLUMNS, which lazygit sets to the diff pane's inner width, and NOT
     #   the {{columnWidth}} template: that one is the side panel column, about
     #   0.3x the terminal (26 in a 100-column terminal against a 64-wide pane).
-    # The colours and layout below are Claude Code's own diff renderer, read out
-    # of its binary: it does not use delta or any external differ, so these are
-    # transcribed rather than shared. Dark-theme truecolor values.
-    #   #022800 added row      #044700 added changed-words
-    #   #3D0100 removed row    #5C0200 removed changed-words
-    #   #50C850 added gutter   #DC5A5A removed gutter
-    # minus-style is "normal", not "syntax": Claude Code deliberately does not
-    #   syntax-highlight removed lines, only added and context ones.
-    # syntax-theme: Claude Code uses Monokai Extended, which is also delta's own
-    #   default, i.e. what this config had before I switched it to Nord.
+    # The layout below is Claude Code's own diff renderer, read out of its binary
+    #   and reproduced by delta-fill. The colours were too, until reviewr arrived;
+    #   they now track reviewr's tokyo-night so the two diff surfaces match.
+    # reviewr derives its fills rather than listing them: it tints the theme base
+    #   (#1a1b26) with the red or green anchor and steps the tint down until the
+    #   row text still clears WCAG 4.5 against it, which lands on these. Recompute
+    #   from readable_tint() in reviewr's src/theme.rs if the theme changes.
+    #   #343f34 added row      #4a5b3e added changed-words
+    #   #462d3b removed row    #6e3e4e removed changed-words
+    #   #9ece6a added gutter   #f7768e removed gutter
+    #   #7aa2f7 file header    #3a3b44 its underline
+    # minus-style is "syntax", not "normal": leaving removed lines unhighlighted
+    #   was Claude Code's choice. reviewr fills both sides and keeps the syntax on
+    #   each, so matching it means highlighting removals too.
+    # syntax-theme: TokyoNight, the tmTheme reviewr bundles — folke's, the same
+    #   author as ghostty's and nvim's, so it is the Night variant (#1a1b26), a
+    #   step darker than ghostty's Storm background. delta has no theme directory
+    #   of its own and reads bat's cache, so the file lives in
+    #   ~/.config/bat/themes and needs `bat cache --build` after any change.
+    #   That is the only reason bat is installed.
     # max-line-distance: Claude Code bails out of word-level highlighting once
     #   more than 0.4 of the line has changed. Delta's default is 0.6, which is
     #   what was matching near-unrelated prose lines and scattering shading.
@@ -28,7 +38,7 @@ git:
     #   Delta cannot reproduce Claude Code's old-number-on-removed-lines: with
     #   '{nm}{np}' context rows print both numbers. So removals show a blank.
     - command: >-
-        delta --paging=never --width=$COLUMNS --syntax-theme='Monokai Extended' --line-numbers --keep-plus-minus-markers --max-line-distance=0.4 --hunk-header-style=omit --file-style='bold #61AFEF' --file-decoration-style='#3B4048 ul' --plus-style='syntax #022800' --plus-emph-style='syntax #044700' --minus-style='normal #3D0100' --minus-emph-style='normal #5C0200' --line-numbers-left-format= --line-numbers-right-format='{np:>4}' --line-numbers-plus-style='#50C850' --line-numbers-minus-style='#DC5A5A' --line-numbers-zero-style=dim | ~/.config/lazygit/delta-fill $COLUMNS 5
+        delta --paging=never --width=$COLUMNS --syntax-theme='TokyoNight' --line-numbers --keep-plus-minus-markers --max-line-distance=0.4 --hunk-header-style=omit --file-style='bold #7aa2f7' --file-decoration-style='#3a3b44 ul' --plus-style='syntax #343f34' --plus-emph-style='syntax #4a5b3e' --minus-style='syntax #462d3b' --minus-emph-style='syntax #6e3e4e' --line-numbers-left-format= --line-numbers-right-format='{np:>4}' --line-numbers-plus-style='#9ece6a' --line-numbers-minus-style='#f7768e' --line-numbers-zero-style=dim | ~/.config/lazygit/delta-fill $COLUMNS 5
   # 3 lines of context shows only the change. 20 gives enough of the surrounding
   # file to scroll through it. Adjustable live with } and {.
   diffContextSize: 20
