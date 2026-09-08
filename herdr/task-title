@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""Give Herdr agent panes a project fallback, a short task title, and a name."""
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import select
+import socket
+import subprocess
+import sys
+import time
+
+SOURCE = "local:task-title"
+STATE_ROOT = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "herdr/task-titles"
+GENERIC_TITLES = {
+    "claude": {"claude", "claude code"},
+    "pi": {"pi", "π"},
+    "opencode": {"opencode", "open code"},
+    "codex": {"codex"},
+    "cursor": {"cursor", "cursor agent"},
+}
+
+
+def clean_text(value):
+    value = re.sub(r"[\x00-\x1f\x7f]", " ", str(value or ""))
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def project_name(cwd):
+    cwd = Path(cwd or os.getcwd()).expanduser()
+    try:
+        root = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "--show-toplevel"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).stdout.strip()
+        if root:
+            cwd = Path(root)
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    return cwd.resolve().name or "terminal"
+
+
+def shorten_prompt(prompt):
+    text = clean_text(prompt)
+    text = re.sub(r"^/[A-Za-z0-9:_-]+\s*", "", text)
+    text = re.sub(
+        r"^(?:ok(?:ay)?\s+|now\s+|please\s+|can (?:we|you)\s+|could you\s+|"
+        r"would you\s+|help me\s+|i (?:want|need) (?:you )?to\s+|let(?:'|’)s\s+)+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"^[^\w]+|[.!?,;:]+$", "", text)
+    words = text.split()
+    if not words:
+        return ""
+    title = " ".join(words[:6])
+    if len(title) > 48:
+        title = title[:48].rsplit(" ", 1)[0] or title[:48]
+    return title[0].upper() + title[1:]
+
+
+def state_path(kind, session_id, pane_id):
+    identity = session_id or pane_id
+    digest = hashlib.sha256(f"{kind}\0{identity}".encode()).hexdigest()[:24]
+    return STATE_ROOT / f"{kind}-{digest}.json"
+
+
+def read_state(path):
+    try:
+        value = json.loads(path.read_text())
+        if isinstance(value.get("title"), str):
+            return value
+    except (OSError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def write_state(path, title, provisional):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps({"title": title, "provisional": provisional}) + "\n")
+    os.replace(temporary, path)
+
+
+def report(kind, pane_id, title):
+    socket_path = os.environ.get("HERDR_SOCKET_PATH")
+    if os.environ.get("HERDR_ENV") != "1" or not socket_path or not pane_id:
+        return
+    request = {
+        "id": f"{SOURCE}:{time.time_ns()}",
+        "method": "pane.report_metadata",
+        "params": {
+            "pane_id": pane_id,
+            "source": SOURCE,
+            "agent": kind,
+            "seq": time.time_ns(),
+            "tokens": {"task": title},
+        },
+    }
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(0.5)
+            client.connect(socket_path)
+            client.sendall((json.dumps(request) + "\n").encode())
+            client.recv(4096)
+    except OSError:
+        pass
+
+
+def agent_name(title, pane_id):
+    """Slug for `herdr agent rename`: [a-z][a-z0-9_-]{0,31}, unique among live agents."""
+    name = re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", title.lower())).strip("-")
+    name = re.sub(r"^[^a-z]+", "", name)[:32].rstrip("-")
+    return name
+
+
+def rename_agent(name, pane_id):
+    # Names make an agent addressable as `herdr agent prompt <name>`, so a task
+    # title beats a pane ID for anything that talks to another pane. Renaming to
+    # the name this pane already holds is a no-op, so this can run every hook.
+    result = subprocess.run(
+        ["herdr", "agent", "rename", pane_id, name],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        return json.loads(result.stderr)["error"]["code"]
+    except (ValueError, KeyError, TypeError):
+        return ""
+
+
+def name_agent(title, pane_id):
+    if os.environ.get("HERDR_ENV") != "1" or not pane_id:
+        return
+    name = agent_name(title, pane_id)
+    if not name:
+        return
+    try:
+        if rename_agent(name, pane_id) != "agent_name_taken":
+            return
+        # Two panes on the same task: fall back to a name carrying the pane ID.
+        suffix = re.sub(r"[^a-z0-9]", "", pane_id.lower())
+        rename_agent(f"{name[:31 - len(suffix)]}-{suffix}", pane_id)
+    except OSError:
+        pass
+
+
+def native_title(kind, pane_id, fallback):
+    try:
+        output = subprocess.run(
+            ["herdr", "pane", "get", pane_id],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).stdout
+        title = clean_text(json.loads(output)["result"]["pane"].get("terminal_title_stripped"))
+    except (OSError, subprocess.CalledProcessError, KeyError, TypeError, ValueError):
+        return ""
+    lowered = title.lower()
+    if not title or lowered == fallback.lower() or lowered in GENERIC_TITLES.get(kind, set()):
+        return ""
+    if re.fullmatch(r"(?:[0-9a-f]{8}-?){2,}|01[a-z0-9-]{20,}", lowered):
+        return ""
+    if lowered.startswith(("no space left", "action required", "working", "thinking")):
+        return ""
+    # Herdr's own pane title is "<command> ~/short/cwd", which a harness that has
+    # not set a title of its own leaves in place: "codex ~/p/learning-to-price".
+    if re.search(r"\s~/\S*$", title):
+        return ""
+    if kind == "pi" and (title.startswith("π - ") or title.startswith("Pi - ")):
+        return ""
+    return title[:64]
+
+
+def payload_value(payload, *names):
+    for name in names:
+        value = payload.get(name)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("kind", choices=tuple(GENERIC_TITLES))
+    parser.add_argument("--title")
+    parser.add_argument("--cwd")
+    parser.add_argument("--session")
+    parser.add_argument("--pane")
+    parser.add_argument("--native", action="store_true")
+    args = parser.parse_args()
+
+    # Hook payloads arrive on stdin, but a caller that leaves stdin an open empty
+    # pipe (node's execFile does) would block json.load for the life of that
+    # caller. Wait a beat for data, then treat it as no payload.
+    payload = {}
+    if select.select([sys.stdin], [], [], 1.0)[0]:
+        try:
+            payload = json.load(sys.stdin)
+        except (ValueError, OSError):
+            payload = {}
+
+    pane_id = args.pane or os.environ.get("HERDR_PANE_ID", "")
+    session_id = args.session or payload_value(
+        payload, "session_id", "sessionId", "conversation_id", "conversationId"
+    )
+    cwd = args.cwd or payload_value(payload, "cwd", "directory", "workspace") or os.getcwd()
+    fallback = project_name(cwd)
+    path = state_path(args.kind, session_id, pane_id)
+    current = read_state(path)
+
+    event = payload_value(payload, "hook_event_name", "hookEventName", "event")
+    prompt = payload_value(payload, "prompt", "user_prompt", "userPrompt", "text", "message")
+
+    title = clean_text(args.title) if args.title else ""
+    provisional = False
+    if args.native or event.lower() in {"stop", "sessionstop", "afteragentresponse"}:
+        title = native_title(args.kind, pane_id, fallback)
+    elif title:
+        provisional = False
+    elif prompt and (not current or current.get("provisional", True)):
+        title = shorten_prompt(prompt)
+    elif current:
+        title = current["title"]
+        provisional = bool(current.get("provisional"))
+    else:
+        title = fallback
+        provisional = True
+
+    if not title:
+        title = current["title"] if current else fallback
+        provisional = bool(current.get("provisional")) if current else True
+
+    write_state(path, title, provisional)
+    report(args.kind, pane_id, title)
+    name_agent(title, pane_id)
+
+
+if __name__ == "__main__":
+    main()

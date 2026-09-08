@@ -5,6 +5,7 @@
 !ghostty/**
 !herdr/config.toml
 !herdr/pick
+!herdr/herdr-cheatsheet.*
 !htop/**
 !lazygit/**
 !nvim/**

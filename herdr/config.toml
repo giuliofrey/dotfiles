@@ -1,3 +1,4 @@
+onboarding = false
 # herdr configuration. Reload in place with prefix+shift+r or
 # `herdr server reload-config`. Settings that describe how a pane is created
 # (default_shell, new_cwd) only reach panes opened after the reload; the only
@@ -26,25 +27,93 @@ prefix = "ctrl+space"
 # herdr defaults and already match tmux.conf. The vertical split stays on
 # prefix+v rather than tmux's prefix+| because herdr does not accept | as a key.
 
-# prefix+f, the project picker, same key as tmux.conf. See herdr/pick.
+# prefix+j/k walk the sidebar agent list. herdr ships next_agent and
+# previous_agent unbound, so there was no way to reach an agent without the
+# mouse or the workspace picker. That means giving up focus_pane_down/up, which
+# is the trade worth making: splits here are side by side and prefix+hl covers
+# them, while the agent list is the vertical thing actually worth walking.
+# Not alt+1..9, herdr's suggested focus_agent binding: ghostty here has no
+# macos-option-as-alt, so alt chords never arrive.
+next_agent = "prefix+j"
+previous_agent = "prefix+k"
+focus_pane_down = ""
+focus_pane_up = ""
+
+# open_notification_target moves off its default prefix+o, which the herdr-nvim
+# file picker took below. It focuses the pane that raised the last notification,
+# the other half of [ui.toast] delivery: the toast says something wants you, this
+# key goes there. prefix+shift+o is unclaimed in herdr's defaults.
+open_notification_target = "prefix+shift+o"
+
+# prefix+f, the project picker, same key as tmux.conf. Now josephschmitt/pj-herdr
+# rather than the hand-rolled herdr/pick it replaced: pj caches its own discovery
+# (5 min TTL, 0.007s warm against 0.45s for the find + git-log walk pick did), and
+# the plugin's picker carries actions pick had no way to offer — ctrl-w opens the
+# project as a herdr worktree, ctrl-n forces a second workspace, ctrl-t a tab.
+#
+# Television, not fzf, in plugins/config/pj/config: those extra actions are the
+# tv channel's keybindings and simply do not exist in the plugin's fzf path.
+#
+# What it costs: pj sorts alphabetically, so the by-last-commit ordering that
+# tmux/sessionizer explains at length is gone here. It also only finds what its
+# markers match, tuned in ~/.config/pj/config.yaml.
 [[keys.command]]
 key = "prefix+f"
-type = "popup"
-command = "$HOME/.config/herdr/pick"
-width = "70%"
-height = "60%"
+type = "plugin_action"
+command = "pj.open-picker"
+description = "project picker"
 
-# prefix+a, a second agent beside this one. herdr has no built-in binding for
-# starting an agent: `agent start` needs a pane that already exists, so the
-# split has to come first, and this is the one-line version of that.
+# prefix+a opens a compact chooser for every installed coding harness, then
+# starts the choice in a full-width tab rooted at the active pane's cwd. The
+# chooser keeps a most-recently-used order, so pressing prefix+a then Enter
+# immediately starts another copy of whichever harness was chosen last.
 #
-# `fish -C claude` rather than `claude`, because a type="pane" command closes
-# its pane when it exits and quitting the agent should leave a shell behind,
-# not collapse the split. Same reasoning as the sessionizer's send-keys.
+# A tab rather than a split keeps Herdr's unseen/done tracking independent for
+# each agent. `pane run` types into that tab's shell, so quitting the harness
+# leaves a fish prompt instead of closing the tab.
 [[keys.command]]
 key = "prefix+a"
-type = "pane"
-command = "fish -C claude"
+type = "popup"
+command = "$HOME/.config/herdr/harness-picker"
+description = "Choose Harness"
+width = "36%"
+height = "40%"
+
+# prefix+shift+a, the background sessions for the workspace you are in. herdr
+# cannot list them itself: its claude integration is a hook that exits unless
+# HERDR_PANE_ID is set, and a session dispatched from the agent view has no
+# pane, so the sidebar never sees one. This is the way to reach them.
+#
+# --cwd matches sessions started *under* a path, and agents are dispatched from
+# the workspace root, so the git root is the right anchor and the pane cwd is
+# not: hit this from a subdirectory and a plain $HERDR_ACTIVE_PANE_CWD would
+# quietly match nothing. Falls back to the pane cwd outside a repo.
+#
+# A popup, like lazygit on prefix+d: you come here to unblock something and
+# leave, not to work.
+[[keys.command]]
+key = "prefix+shift+a"
+type = "popup"
+command = "d=$HERDR_ACTIVE_PANE_CWD; r=$(git -C \"$d\" rev-parse --show-toplevel 2>/dev/null) && d=$r; claude agents --cwd \"$d\""
+description = "background agents here"
+width = "90%"
+height = "90%"
+
+# prefix+space, tmux's next-layout: even-horizontal, even-vertical,
+# main-horizontal, main-vertical, tiled. herdr has no layout concept of its own,
+# so herdr/flip rebuilds each one pane by pane; see its docstring for how, and
+# for what it costs.
+#
+# type = "shell", like prefix+t: the script talks to the API and has nothing to
+# draw, so it wants no pane of its own.
+#
+# prefix+space reads as a chord on a ctrl+space prefix, and it is: herdr takes
+# the prefix key and the bound key separately, so the space is not swallowed.
+[[keys.command]]
+key = "prefix+space"
+type = "shell"
+command = "$HOME/.config/herdr/flip"
+description = "next pane layout"
 
 # lazygit moves from the sessionizer's permanent left pane to a popup: the
 # herdr sidebar already carries branch and git status, so that pane sat idle
@@ -63,7 +132,35 @@ height = "90%"
 [ui]
 # The sidebar is the reason to run herdr at all, so give it the branch and
 # status line the tmux status bar never had.
-agent_panel_sort = "spaces"
+agent_panel_sort = "priority"
+# prefix+c opens a tab straight away instead of stopping for a name. herdr's
+# generated names are numbers, which is what tmux does and what the tab row was
+# already showing; prefix+shift+t still renames one that earns a real name.
+prompt_new_tab_name = false
+# Clock in the top right of the tab row. Local time is a native datetime entry,
+# which renders with the UI and costs nothing. Kampala has to be a command:
+# datetime takes a `format` and nothing else, so there is no timezone to set,
+# and the value is always the server's own wall clock.
+#
+# 30s means the minute can read up to half a minute stale, which is fine for a
+# reference clock and beats spawning `date` twice as often. `date` resolves
+# Africa/Kampala from the system zoneinfo, so DST is not a question either way:
+# EAT has none.
+tab_bar_right = [
+  { type = "command", command = "TZ=Africa/Kampala date +'%H:%M kla'", interval_seconds = 30, timeout_seconds = 2 },
+  { type = "datetime", format = "%H:%M chi" },
+]
+tab_bar_right_separator = " · "
+show_agent_labels_on_pane_borders = false
+# The harness picker reports a compact $harness token for each agent it opens:
+# π for Pi, cc for Claude Code, oc for OpenCode, cx for Codex, and cu for Cursor.
+# It sits directly after the tab number. $task starts as the project name, then
+# the harness hooks replace it with a short title from the first prompt (or the
+# harness's better generated title). Keeping that in its own metadata token
+# avoids names such as "π - .config" and status glyphs from terminal titles.
+[ui.sidebar.agents]
+rows = [["state_icon", "workspace", "tab", "$harness"], ["$task"]]
+
 [ui.sidebar.spaces]
 rows = [["state_icon", "workspace"], ["branch", "git_status"]]
 
@@ -71,7 +168,7 @@ rows = [["state_icon", "workspace"], ["branch", "git_status"]]
 # Desktop notifications when a background agent finishes or blocks. The
 # Notification hook in ~/.claude/settings.json only rings the bell, which is
 # useless once the pane is off-screen.
-delivery = "system"
+delivery = "terminal"
 
 # The herdr side of ChmaraX/herdr-nvim, installed with `herdr plugin install`.
 # prefix+e opens nvim as a sidebar pane, prefix+o jumps to a file path printed

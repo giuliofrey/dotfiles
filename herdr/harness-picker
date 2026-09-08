@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Pick an installed coding harness by recency and open it in a new tab."""
+
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+# Display order before any selections have been made. The state file below then
+# keeps these in most-recently-used order. The final value is the compact label
+# shown beside the tab number in Herdr's agent sidebar.
+HARNESSES = (
+    ("claude", "claude", "Claude Code", "cc"),
+    ("pi", "pi", "Pi", "π"),
+    ("opencode", "opencode", "OpenCode", "oc"),
+    ("codex", "codex", "Codex", "cx"),
+    ("cursor", "cursor-agent", "Cursor Agent", "cu"),
+)
+STATE = (
+    Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
+    / "herdr/harness-mru"
+)
+
+
+def available_harnesses():
+    available = {
+        kind: (command, label, abbreviation)
+        for kind, command, label, abbreviation in HARNESSES
+        if shutil.which(command)
+    }
+    try:
+        remembered = STATE.read_text().splitlines()
+    except FileNotFoundError:
+        remembered = []
+
+    order = []
+    for kind in remembered + [item[0] for item in HARNESSES]:
+        if kind in available and kind not in order:
+            order.append(kind)
+    return [(kind, *available[kind]) for kind in order]
+
+
+def pick(harnesses):
+    result = subprocess.run(
+        [
+            "fzf",
+            "--no-sort",
+            "--layout=reverse",
+            "--info=hidden",
+            "--no-scrollbar",
+            "--no-separator",
+            "--prompt=› ",
+            "--header=Enter launch · Esc cancel",
+            "--header-first",
+        ],
+        input="".join(f"{label}\n" for _, _, label, _ in harnesses),
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode not in (0, 1, 130):
+        raise subprocess.CalledProcessError(result.returncode, result.args)
+    if result.returncode != 0:
+        return None
+
+    selected = result.stdout.rstrip("\n")
+    return next((item for item in harnesses if item[2] == selected), None)
+
+
+def remember(kind, harnesses):
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    order = [kind] + [candidate for candidate, *_ in harnesses if candidate != kind]
+    temporary = STATE.with_name(f".{STATE.name}.{os.getpid()}.tmp")
+    temporary.write_text("".join(f"{candidate}\n" for candidate in order))
+    os.replace(temporary, STATE)
+
+
+def main():
+    if not shutil.which("fzf"):
+        sys.exit("harness-picker: fzf is not installed")
+
+    harnesses = available_harnesses()
+    if not harnesses:
+        sys.exit("harness-picker: no supported coding harness is installed")
+
+    selected = pick(harnesses)
+    if selected is None:
+        return
+    kind, command, _, abbreviation = selected
+
+    cwd = os.environ.get("HERDR_ACTIVE_PANE_CWD") or os.getcwd()
+    created = subprocess.run(
+        ["herdr", "tab", "create", "--cwd", cwd, "--focus"],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    pane_id = json.loads(created.stdout)["result"]["root_pane"]["pane_id"]
+    subprocess.run(["herdr", "pane", "run", pane_id, command], check=True)
+    subprocess.run(
+        [
+            str(Path.home() / ".config/herdr/task-title"),
+            kind,
+            "--cwd",
+            cwd,
+            "--pane",
+            pane_id,
+        ],
+        check=True,
+        stdin=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        [
+            "herdr",
+            "pane",
+            "report-metadata",
+            pane_id,
+            "--source",
+            "herdr:harness-picker",
+            "--agent",
+            kind,
+            "--token",
+            f"harness={abbreviation}",
+        ],
+        check=True,
+    )
+    remember(kind, harnesses)
+
+
+if __name__ == "__main__":
+    main()
