@@ -3,9 +3,7 @@
 -- ChmaraX/herdr-nvim`) and bound to prefix+e / prefix+o in herdr/config.toml.
 return {
   "ChmaraX/herdr-nvim",
-  -- The default prefix is <leader>a, which is LazyVim's +ai group: the
-  -- claudecode extra already owns <leader>ac and <leader>as, the exact two keys
-  -- this plugin wants. <leader>h is free here (harpoon2 is the only extra that
-  -- claims it, and it is not enabled).
+  -- Keep herdr separate from Sidekick's <leader>a shortcuts.
+  -- <leader>h is free here (the harpoon2 extra is not enabled).
   opts = { prefix = "<leader>h" },
 }
