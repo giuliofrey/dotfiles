@@ -16,4 +16,7 @@
 # fish/config.fish instead so it is visible and travels with the repo.
 fish/fish_variables
 tmux/plugins/
+# Same for herdr's: `herdr plugin install` clones a git repo per plugin, and an
+# embedded repo shows up as an untracked directory whatever the allowlist says.
+herdr/plugins/
 .DS_Store
