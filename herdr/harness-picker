@@ -14,7 +14,6 @@ import sys
 HARNESSES = (
     ("claude", "claude", "Claude Code", "cc"),
     ("pi", "pi", "Pi", "π"),
-    ("opencode", "opencode", "OpenCode", "oc"),
     ("codex", "codex", "Codex", "cx"),
     ("cursor", "cursor-agent", "Cursor Agent", "cu"),
 )
