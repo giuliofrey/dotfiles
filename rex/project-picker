@@ -1,0 +1,49 @@
+#!/bin/sh
+# Project picker for Rex, opened in a floating pane by ctrl+space>f (init.lua).
+# Same list and order as tmux's prefix+f: git repos under ~/personal, ~/projects
+# and ~/.config, most recently committed first (tmux/sessionizer --list).
+# Opens, or returns to, a session named after the project's folder.
+#
+#   project-picker [CLIENT_ID]   CLIENT_ID is the Rex app to switch; init.lua passes it
+
+set -eu
+# Appended, not prepended, so the test's fake rex/fzf win over the real ones.
+PATH="$PATH:/opt/homebrew/bin"
+client=${1:-}
+# Rex sessions keep no directory, so remember which folder each name was made
+# for: name<TAB>dir, newest last. Only used to tell two same-named folders apart.
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/rex/projects"
+
+command -v fzf >/dev/null 2>&1 || { echo "fzf not found in PATH"; sleep 3; exit 1; }
+
+# $HOME/{} stays unquoted: fzf substitutes {} already shell-quoted.
+picked=$("$HOME/.config/tmux/sessionizer" --list | sed 's|^~/||' | fzf \
+	--prompt='project> ' \
+	--reverse \
+	--no-sort \
+	--border=none \
+	--preview='git -C $HOME/{} log -1 --format="%cr%n%s" 2>/dev/null || echo "no commits"' \
+	--preview-window=down,2,border-top) || exit 0
+[ -n "$picked" ] || exit 0
+dir="$HOME/$picked"
+
+sessions=$(rex ls --json | jq -r '.sessions[] | [.label, .session_id] | @tsv')
+id_of() { printf '%s\n' "$sessions" | awk -F'\t' -v n="$1" '$1 == n { print $2; exit }'; }
+dir_of() { awk -F'\t' -v n="$1" '$1 == n { d = $2 } END { print d }' "$STATE" 2>/dev/null || true; }
+
+# Folder name, like tmux. A name already held by a live session for another
+# folder (or a session the picker didn't make) gets the parent folder in front,
+# so two "website" repos don't silently share one session.
+name=$(basename "$dir")
+if [ -n "$(id_of "$name")" ] && [ "$(dir_of "$name")" != "$dir" ]; then
+	name="$(basename "$(dirname "$dir")")-$name"
+fi
+
+id=$(id_of "$name")
+if [ -z "$id" ]; then
+	id=$(rex new "$name" -c "$dir" --window Terminal --json -- fish | jq -r .session_id)
+	mkdir -p "$(dirname "$STATE")"
+	printf '%s\t%s\n' "$name" "$dir" >>"$STATE"
+fi
+
+rex ${client:+-C "$client"} do session.select session_id="$id" >/dev/null
