@@ -6,6 +6,8 @@
 !herdr/config.toml
 !herdr/flip
 !herdr/harness-picker
+!herdr/task-title
+!herdr/test_task_title.py
 !herdr/herdr-cheatsheet.*
 !htop/**
 !lazygit/**
