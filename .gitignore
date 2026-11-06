@@ -9,6 +9,7 @@
 !herdr/task-title
 !herdr/test_task_title.py
 !herdr/herdr-cheatsheet.*
+!pj/**
 !htop/**
 !lazygit/**
 !nvim/**

@@ -1,0 +1,36 @@
+# Config for pj, the project finder behind the pj-herdr plugin (prefix+f).
+# Paths and markers match what tmux/sessionizer walks, so the two pickers agree
+# on what counts as a project.
+
+search_paths:
+  - ~/personal
+  - ~/projects
+  - ~/.config
+
+# .git alone, not pj's default marker list. The defaults also match go.mod,
+# package.json, Makefile and friends, which turns every subdirectory holding a
+# Makefile into a "project" — 27 hits under ~/projects instead of the repos
+# actually worth opening a workspace for.
+markers:
+  - marker: .git
+
+# sessionizer walks 10 levels; pj's default 3 misses repos nested under
+# archive/ and artifacts/.
+max_depth: 10
+
+# Virtualenvs dominate the walk here (28k of 38k directories) and never hold a
+# project worth opening. Same prune list as sessionizer, plus pj's own defaults.
+excludes:
+  # .git must stay: drop it and pj descends into every repo's object store and
+  # reports 1517 "projects" instead of 46.
+  - .git
+  - .venv
+  - venv
+  - node_modules
+  - __pycache__
+  - vendor
+  - target
+  - dist
+  - build
+
+nested: false
