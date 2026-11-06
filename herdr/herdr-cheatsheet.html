@@ -161,7 +161,7 @@
     <table>
       <tr><td class="k"><kbd>c</kbd></td><td class="d">new tab, <i>asks for a name first</i></td></tr>
       <tr><td class="k"><kbd>n</kbd> <kbd>p</kbd></td><td class="d">next / previous tab</td></tr>
-      <tr><td class="k"><kbd>1</kbd><span class="thru">–</span><kbd>9</kbd></td><td class="d">jump to a tab by index</td></tr>
+      <tr><td class="k"><kbd>1</kbd><span class="thru">–</span><kbd>9</kbd></td><td class="d">jump to an agent by priority position <i>(1 = most urgent; tabs: <kbd>g</kbd> then 1–9)</i></td></tr>
       <tr><td class="k"><kbd>shift</kbd><span class="plus">+</span><kbd>t</kbd></td><td class="d">rename this tab</td></tr>
       <tr><td class="k"><kbd>shift</kbd><span class="plus">+</span><kbd>x</kbd></td><td class="d">close this tab</td></tr>
     </table>
@@ -211,7 +211,7 @@
       <tr><td class="k"><kbd>s</kbd></td><td class="d">settings</td></tr>
       <tr><td class="k"><kbd>q</kbd></td><td class="d">detach, and the server keeps every pane running</td></tr>
       <tr><td class="k"><kbd>shift</kbd><span class="plus">+</span><kbd>r</kbd></td><td class="d">reload config.toml in place</td></tr>
-      <tr><td class="k"><kbd class="mine">shift</kbd><span class="plus">+</span><kbd class="mine">o</kbd></td><td class="d">go to the pane that raised the last notification <i>(moved off <kbd>o</kbd>, which now picks files)</i></td></tr>
+      <tr><td class="k"><kbd class="mine">o</kbd></td><td class="d">open the visible in-app notification target <i>(Herdr 0.9.3: requires <code>delivery = "herdr"</code>; terminal delivery has no target)</i></td></tr>
     </table>
     <div class="note">A reload reaches everything except how a pane is <i>created</i>: <code>default_shell</code> and <code>new_cwd</code> only apply to panes opened afterwards, and <code>sidebar_start_collapsed</code> waits for a full relaunch.</div>
   </section>
@@ -228,11 +228,11 @@
       <tr><td class="k"><kbd class="mine">shift</kbd><span class="plus">+</span><kbd class="mine">a</kbd></td><td class="d">the background <code>claude agents</code> for this repo, in a popup. The sidebar cannot show them: a dispatched session has no pane of its own</td></tr>
       <tr><td class="k"><kbd class="mine">d</kbd></td><td class="d">lazygit, in a popup <i>(not <kbd>g</kbd>: that is navigate mode)</i></td></tr>
       <tr><td class="k"><kbd class="mine">e</kbd></td><td class="d">nvim as a full-height sidebar</td></tr>
-      <tr><td class="k"><kbd class="mine">o</kbd></td><td class="d">open a file path printed in the agent's output</td></tr>
+      <tr><td class="k"><kbd class="mine">shift</kbd><span class="plus">+</span><kbd class="mine">o</kbd></td><td class="d">open a file path printed in the agent's output</td></tr>
       <tr><td class="k"><kbd class="mine">r</kbd></td><td class="d">reviewr's diff pane, on and off</td></tr>
       <tr><td class="k"><kbd class="mine">t</kbd></td><td class="d">your Pythia slurm queue, split to the right over ssh</td></tr>
     </table>
-    <div class="note"><b>prefix+e</b> and <b>prefix+o</b> come from the herdr-nvim plugin; on the nvim side its own keys hang off <code>&lt;leader&gt;h</code>. Add more with <code>herdr plugin install &lt;user/repo&gt;</code>.</div>
+    <div class="note"><b>prefix+e</b> and <b>prefix+shift+o</b> come from the herdr-nvim plugin; on the nvim side its own keys hang off <code>&lt;leader&gt;h</code>. Add more with <code>herdr plugin install &lt;user/repo&gt;</code>.</div>
   </section>
 
   <section>
@@ -250,7 +250,7 @@
 </main>
 
 <footer>
-  <div><b>Where the stock layout gave way:</b> lazygit left its permanent pane for a popup, because the sidebar already shows branch and status. <kbd>o</kbd> moved to <kbd>shift</kbd><span class="plus">+</span><kbd>o</kbd> for the file picker; <kbd>e</kbd> and <kbd>r</kbd> now carry the nvim sidebar and reviewr rather than scrollback editing and resize mode.</div>
+  <div><b>Where the stock layout gave way:</b> lazygit left its permanent pane for a popup, because the sidebar already shows branch and status. <kbd>o</kbd> keeps notification navigation; the file picker uses <kbd>shift</kbd><span class="plus">+</span><kbd>o</kbd>; <kbd>e</kbd> and <kbd>r</kbd> now carry the nvim sidebar and reviewr rather than scrollback editing and resize mode.</div>
 </footer>
 
 </body>

@@ -4,7 +4,8 @@
 !fish/**
 !ghostty/**
 !herdr/config.toml
-!herdr/pick
+!herdr/flip
+!herdr/harness-picker
 !herdr/herdr-cheatsheet.*
 !htop/**
 !lazygit/**

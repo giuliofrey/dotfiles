@@ -6,6 +6,12 @@ command = /opt/homebrew/bin/fish --login --interactive
 theme = dark:TokyoNight Storm,light:TokyoNight Day
 desktop-notifications = true
 working-directory = home
+macos-titlebar-style = transparent
 window-width = 80
 window-height = 24
 confirm-close-surface = false
+
+# >>> herdr-radar font block
+font-codepoint-map = U+E1A0-U+E1BA=Herdr Agent Icons Max
+font-codepoint-map = U+E1C0-U+E1C5=Herdr Agent Icons Max
+# <<< herdr-radar font block
