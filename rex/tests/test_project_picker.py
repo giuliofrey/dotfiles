@@ -1,4 +1,4 @@
-"""rex/project-picker with fake rex, fzf and sessionizer on PATH. Run from ~/.config:
+"""rex/project-picker with fake rex and fzf on PATH and repos under a fake HOME. Run from ~/.config:
 python3 -m unittest discover -s rex/tests -p 'test_*.py'"""
 import json
 import os
@@ -29,14 +29,13 @@ class ProjectPicker(unittest.TestCase):
         bin_.mkdir()
         for name, body in {
             "rex": FAKE_REX,
-            "fzf": '#!/bin/sh\ncat > /dev/null; cat "$FAKE/pick"\n',
+            # Picks $FAKE/pick, but only if the picker actually listed it.
+            "fzf": '#!/bin/sh\ngrep -qx "$(cat "$FAKE/pick")" && cat "$FAKE/pick"\n',
         }.items():
             (bin_ / name).write_text(body)
             (bin_ / name).chmod(0o755)
-        sessionizer = self.tmp / ".config/tmux/sessionizer"
-        sessionizer.parent.mkdir(parents=True)
-        sessionizer.write_text("#!/bin/sh\necho '~/projects/a/site'; echo '~/projects/b/site'\n")
-        sessionizer.chmod(0o755)
+        for repo in ("projects/a/site", "projects/b/site"):
+            (self.tmp / repo / ".git").mkdir(parents=True)
         self.env = {**os.environ, "HOME": str(self.tmp), "FAKE": str(self.tmp),
                     "PATH": f"{bin_}:{os.environ['PATH']}", "XDG_STATE_HOME": str(self.tmp / "state")}
         self.write_sessions([{"label": "crisp-prairie", "session_id": "session:x"}])

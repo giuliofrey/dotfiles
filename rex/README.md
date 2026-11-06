@@ -1,12 +1,12 @@
 # Rex project workspaces
 
-Press **ctrl+space** then **f** (the tmux and herdr prefix+f) to open the
-project picker in a floating pane, or search **Open Project…** in the command
-palette. It lists the same git repos as tmux's picker, most recently committed
-first (`tmux/sessionizer --list`). Enter opens the project's Fish session, or
+Press **ctrl+space** then **f** (herdr's prefix+f) to open the project picker
+in a floating pane, or search **Open Project…** in the command palette. It
+lists git repos under `~/personal`, `~/projects` and `~/.config`, most recently
+committed first. Enter opens the project's Fish session, or
 returns to it if it is already open; Escape closes the picker.
 
-Sessions are named after the project's folder, like tmux. When another session
+Sessions are named after the project's folder. When another session
 already uses that name, the parent folder goes in front (`b-site`). Rex
 sessions don't record a directory, so `~/.local/state/rex/projects` remembers
 which folder each picker-made name belongs to. Keep the names unchanged:

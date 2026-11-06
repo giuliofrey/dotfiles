@@ -1,5 +1,5 @@
 # Config for pj, the project finder behind the pj-herdr plugin (prefix+f).
-# Paths and markers match what tmux/sessionizer walks, so the two pickers agree
+# Paths and markers match what rex/project-picker walks, so the two pickers agree
 # on what counts as a project.
 
 search_paths:
@@ -14,12 +14,12 @@ search_paths:
 markers:
   - marker: .git
 
-# sessionizer walks 10 levels; pj's default 3 misses repos nested under
+# rex/project-picker walks 10 levels; pj's default 3 misses repos nested under
 # archive/ and artifacts/.
 max_depth: 10
 
 # Virtualenvs dominate the walk here (28k of 38k directories) and never hold a
-# project worth opening. Same prune list as sessionizer, plus pj's own defaults.
+# project worth opening. Same prune list as rex/project-picker, plus pj's own defaults.
 excludes:
   # .git must stay: drop it and pj descends into every repo's object store and
   # reports 1517 "projects" instead of 46.

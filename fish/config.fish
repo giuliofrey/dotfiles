@@ -31,33 +31,3 @@ set -gx EDITOR nvim
 # not there, so a machine without rust is unaffected.
 fish_add_path -g $HOME/.cargo/bin
 
-
-# tmux project picker. Works in or out of tmux: the script switches the client
-# if $TMUX is set, attaches if not.
-abbr -a t "$HOME/.config/tmux/sessionizer"
-# ts: same split layout, but for the directory you are already in. Same thing
-# prefix+F does from inside tmux.
-abbr -a ts "$HOME/.config/tmux/sessionizer ."
-# ta with no argument attaches to the most recent session; `ta name` picks one.
-# A function, not an abbr, because attach-session takes its target from -t and
-# the plain form died on "too many arguments". Name prefixes work, so `ta surv`
-# is enough.
-#
-# A bare number resolves to the Nth line of `tmux ls`, which `tl` prints;
-# sessions are named after their repo, so tmux would read `ta 1` as a name.
-function ta --description "attach to a tmux session by name, number, or the most recent"
-    if not set -q argv[1]
-        tmux attach
-    else if string match -qr '^\d+$' -- $argv[1]
-        set -l target (tmux ls | sed -n "$argv[1]p" | cut -d: -f1)
-        if test -z "$target"
-            echo "no session $argv[1]" >&2
-            return 1
-        end
-        tmux attach -t $target
-    else
-        tmux attach -t $argv[1]
-    end
-end
-# Numbered, because that is what `ta N` counts against.
-abbr -a tl "tmux ls | nl -w2 -s' '"

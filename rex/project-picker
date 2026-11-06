@@ -1,7 +1,7 @@
 #!/bin/sh
 # Project picker for Rex, opened in a floating pane by ctrl+space>f (init.lua).
-# Same list and order as tmux's prefix+f: git repos under ~/personal, ~/projects
-# and ~/.config, most recently committed first (tmux/sessionizer --list).
+# Lists git repos under ~/personal, ~/projects and ~/.config, most recently
+# committed first (the walk the old tmux sessionizer did; see git history).
 # Opens, or returns to, a session named after the project's folder.
 #
 #   project-picker [CLIENT_ID]   CLIENT_ID is the Rex app to switch; init.lua passes it
@@ -14,10 +14,30 @@ client=${1:-}
 # for: name<TAB>dir, newest last. Only used to tell two same-named folders apart.
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/rex/projects"
 
+ROOTS="$HOME/personal $HOME/projects $HOME/.config"
+DEPTH=10 # directory levels below each root to search
+
+# Sorted by last commit, not mtime: mtime churns on any git operation. Virtualenvs
+# and friends are pruned because they dominate the walk and never hold a project.
+# A repo with no commits scores 0 and sorts last instead of vanishing.
+PRUNE='-name .venv -o -name venv -o -name node_modules -o -name __pycache__'
+list_repos() {
+	for root in $ROOTS; do
+		[ -d "$root" ] || continue
+		# shellcheck disable=SC2086
+		find "$root" -maxdepth $((DEPTH + 1)) \
+			\( -type d \( $PRUNE \) -prune \) -o \
+			\( -type d -name .git -prune -print \) 2>/dev/null
+	done | sed 's|/\.git$||' |
+		xargs -P 8 -I{} sh -c \
+			'printf "%s\t%s\n" "$(git -C "$1" log -1 --format=%ct 2>/dev/null || echo 0)" "$1"' _ {} |
+		sort -rn | cut -f2
+}
+
 command -v fzf >/dev/null 2>&1 || { echo "fzf not found in PATH"; sleep 3; exit 1; }
 
 # $HOME/{} stays unquoted: fzf substitutes {} already shell-quoted.
-picked=$("$HOME/.config/tmux/sessionizer" --list | sed 's|^~/||' | fzf \
+picked=$(list_repos | sed "s|^$HOME/||" | fzf \
 	--prompt='project> ' \
 	--reverse \
 	--no-sort \
